@@ -1,0 +1,12 @@
+{
+  "name": "knowlithic-basic-rppg",
+  "version": "1.0.0",
+  "description": "Simple rPPG implementation for heart rate monitoring",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}
