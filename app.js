@@ -164,6 +164,17 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('resize', resizeCanvases);
   resizeCanvases(); // Initial size
 
+  // Check if running on iOS device
+  function isIOS() {
+    return (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) || 
+           (navigator.platform && /iPad|iPhone|iPod/.test(navigator.platform));
+  }
+
+  // Check if this is a mobile device
+  function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  }
+
   // Function to enumerate cameras
   async function listCameras() {
     try {
@@ -171,14 +182,48 @@ document.addEventListener('DOMContentLoaded', () => {
       cameraSelect.innerHTML = '';
       cameraSelect.disabled = true;
       
+      // Special handling for iOS devices
+      if (isIOS()) {
+        console.log('iOS device detected, using simplified camera access');
+        // On iOS, we can't enumerate cameras properly before requesting access
+        // Add a default camera option
+        const option = document.createElement('option');
+        option.value = 'default';
+        option.text = 'Default Camera';
+        cameraSelect.appendChild(option);
+        
+        selectedCameraId = 'default';
+        cameraSelect.value = selectedCameraId;
+        cameraSelect.disabled = true; // Disable selection on iOS as switching is problematic
+        startButton.disabled = false;
+        
+        updateStatus('Camera ready. Click Start to begin Knowlithic analysis.');
+        return;
+      }
+      
+      // For non-iOS devices, proceed with normal enumeration
+      // First request camera access to ensure we get labeled devices
+      if (isMobile()) {
+        // For mobile, use a simpler approach
+        await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+      
       // Get list of available video devices
       const devices = await navigator.mediaDevices.enumerateDevices();
       availableCameras = devices.filter(device => device.kind === 'videoinput');
       
       if (availableCameras.length === 0) {
-        cameraSelect.innerHTML = '<option value="">No cameras found</option>';
-        updateStatus('No cameras detected', true);
-        startButton.disabled = true;
+        // Fallback if no cameras found
+        const option = document.createElement('option');
+        option.value = 'default';
+        option.text = 'Default Camera';
+        cameraSelect.appendChild(option);
+        
+        selectedCameraId = 'default';
+        cameraSelect.value = selectedCameraId;
+        startButton.disabled = false;
+        
+        updateStatus('Using default camera. Click Start to begin Knowlithic analysis.');
         return;
       }
       
@@ -199,7 +244,19 @@ document.addEventListener('DOMContentLoaded', () => {
       updateStatus('Camera detected. Click Start to begin Knowlithic analysis.');
     } catch (error) {
       console.error('Error listing cameras:', error);
-      updateStatus('Error accessing cameras. Please ensure camera permissions are granted.', true);
+      // Fallback for errors
+      cameraSelect.innerHTML = '';
+      const option = document.createElement('option');
+      option.value = 'default';
+      option.text = 'Default Camera';
+      cameraSelect.appendChild(option);
+      
+      selectedCameraId = 'default';
+      cameraSelect.value = selectedCameraId;
+      cameraSelect.disabled = true;
+      startButton.disabled = false;
+      
+      updateStatus('Camera access ready. Click Start to begin.');
     }
   }
   
@@ -218,12 +275,31 @@ document.addEventListener('DOMContentLoaded', () => {
       cameraStatus.style.display = 'none';
       updateStatus('Initializing Knowlithic vital signs analysis...');
       
-      // Configure the VitalLens widget with selected camera
-      vitallensWidget.setAttribute('camera-id', selectedCameraId);
-      
-      // Start the widget
-      await vitallensWidget.startMonitoring();
-      isMonitoring = true;
+      // Handle default camera differently
+      if (selectedCameraId === 'default') {
+        // For iOS and fallback cases, don't set a specific camera ID
+        // and let the browser choose the default camera
+        console.log('Using default camera');  
+        
+        // Start the widget without specifying a camera
+        try {
+          // Make sure we have camera permissions
+          await navigator.mediaDevices.getUserMedia({ video: true });
+          await vitallensWidget.startMonitoring();
+          isMonitoring = true;
+        } catch (mediaError) {
+          console.error('Media access error:', mediaError);
+          throw new Error('Camera access denied. Please allow camera access to use Knowlithic.');
+        }
+      } else {
+        // For non-iOS devices with specific camera selection
+        // Configure the VitalLens widget with selected camera
+        vitallensWidget.setAttribute('camera-id', selectedCameraId);
+        
+        // Start the widget
+        await vitallensWidget.startMonitoring();
+        isMonitoring = true;
+      }
       
       updateStatus('Knowlithic is analyzing your vital signs. Please keep your face visible to the camera.');
     } catch (error) {
