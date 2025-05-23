@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Knowlithic - Vital Signs Analysis</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/vitallens/dist/vitallens.browser.js"></script>
+  <link rel="preconnect" href="https://api.rouast.com" crossorigin>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <div class="logo-icon"><span>K</span></div>
+      </div>
+      <h1>Knowlithic</h1>
+      <p>Advanced vital signs analysis powered by AI</p>
+    </header>
+    
+    <main>
+      <div class="app-container">
+        <div class="controls-container">
+          <div class="card">
+            <h2>Camera Controls</h2>
+            <div class="control-options">
+              <div class="control-group">
+                <label for="camera-select">Camera:</label>
+                <select id="camera-select" disabled>
+                  <option value="">Loading cameras...</option>
+                </select>
+              </div>
+              <div class="control-buttons">
+                <button id="start-button" class="btn btn-primary">Start</button>
+                <button id="stop-button" class="btn btn-danger" disabled>Stop</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="camera-container">
+          <div id="camera-status">Camera access required</div>
+          <div id="camera-widget-container">
+            <!-- VitalLens widget will be placed here -->
+            <vitallens-webcam-widget 
+              api-key="iwMRKQOI1S80X3b1o4RTG3koYHeGHwvJ5h6oRiTe"
+              id="vitallens-widget">
+            </vitallens-webcam-widget>
+          </div>
+        </div>
+        
+        <div class="measurements-container">
+          <div class="card">
+            <h2>Heart Rate</h2>
+            <div class="measurement">
+              <span id="heart-rate-value">--</span>
+              <span class="unit">BPM</span>
+            </div>
+            <div class="confidence-bar">
+              <div id="heart-rate-confidence" class="confidence-level" style="width: 0%"></div>
+            </div>
+          </div>
+          
+          <div class="card">
+            <h2>Respiratory Rate</h2>
+            <div class="measurement">
+              <span id="respiratory-rate-value">--</span>
+              <span class="unit">breaths/min</span>
+            </div>
+            <div class="confidence-bar">
+              <div id="respiratory-rate-confidence" class="confidence-level" style="width: 0%"></div>
+            </div>
+          </div>
+          
+          <div class="card">
+            <h2>Status</h2>
+            <div id="status-message">Waiting for camera...</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="waveform-container">
+        <div class="card">
+          <h2>Pulse Waveform</h2>
+          <canvas id="pulse-waveform" height="100"></canvas>
+        </div>
+        <div class="card">
+          <h2>Respiratory Waveform</h2>
+          <canvas id="respiratory-waveform" height="100"></canvas>
+        </div>
+      </div>
+    </main>
+    
+    <footer>
+      <div class="footer-content">
+        <div class="copyright">
+          <p>© 2025 Knowlithic</p>
+          <p>Version 1.0</p>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p class="disclaimer">Disclaimer: Knowlithic provides measurements for informational purposes only and not for medical use. Always consult healthcare professionals for medical advice.</p>
+      </div>
+    </footer>
+  </div>
+  
+  <script src="app.js"></script>
+</body>
+</html>
