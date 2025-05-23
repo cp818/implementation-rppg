@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Knowlithic - Minimal Version</title>
+  <script src="https://cdn.jsdelivr.net/npm/vitallens/dist/vitallens.browser.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f6f6f6;
+      color: #121212;
+    }
+    
+    h1 {
+      color: #6200ee;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .widget-container {
+      background-color: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      aspect-ratio: 4/3;
+    }
+    
+    .controls {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    
+    button {
+      background-color: #6200ee;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      margin: 0 10px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .status {
+      text-align: center;
+      margin-bottom: 20px;
+      padding: 10px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .stat-card {
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #6200ee;
+      margin: 10px 0;
+    }
+    
+    .stat-unit {
+      color: #757575;
+      font-size: 14px;
+    }
+    
+    footer {
+      text-align: center;
+      color: #757575;
+      font-size: 12px;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Knowlithic</h1>
+    
+    <div class="controls">
+      <button id="start-button">Start Analysis</button>
+      <button id="stop-button" disabled>Stop</button>
+    </div>
+    
+    <div class="status" id="status">Ready to start analysis</div>
+    
+    <div class="widget-container" id="widget-container">
+      <!-- Widget will be added here -->
+    </div>
+    
+    <div class="stats">
+      <div class="stat-card">
+        <h3>Heart Rate</h3>
+        <div class="stat-value" id="heart-rate">--</div>
+        <div class="stat-unit">BPM</div>
+      </div>
+      <div class="stat-card">
+        <h3>Respiratory Rate</h3>
+        <div class="stat-value" id="respiratory-rate">--</div>
+        <div class="stat-unit">breaths/min</div>
+      </div>
+    </div>
+    
+    <footer>
+      <p>© 2025 Knowlithic</p>
+      <p>Disclaimer: Measurements are for informational purposes only, not for medical use.</p>
+    </footer>
+  </div>
+
+  <script>
+    // Constants
+    const API_KEY = 'iwMRKQOI1S80X3b1o4RTG3koYHeGHwvJ5h6oRiTe';
+    
+    // Elements
+    const startButton = document.getElementById('start-button');
+    const stopButton = document.getElementById('stop-button');
+    const statusElement = document.getElementById('status');
+    const widgetContainer = document.getElementById('widget-container');
+    const heartRateElement = document.getElementById('heart-rate');
+    const respiratoryRateElement = document.getElementById('respiratory-rate');
+    
+    // Variables
+    let widget = null;
+    let isAnalyzing = false;
+    
+    // Functions
+    function updateStatus(message, isError = false) {
+      statusElement.textContent = message;
+      statusElement.style.color = isError ? '#cf6679' : '#121212';
+    }
+    
+    async function startAnalysis() {
+      try {
+        // Update UI
+        startButton.disabled = true;
+        stopButton.disabled = false;
+        updateStatus('Starting analysis...');
+        
+        // Clear container
+        widgetContainer.innerHTML = '';
+        
+        // Create widget
+        widget = document.createElement('vitallens-webcam-widget');
+        widget.setAttribute('api-key', API_KEY);
+        widgetContainer.appendChild(widget);
+        
+        // Add event listeners
+        widget.addEventListener('vitals', handleVitalsEvent);
+        widget.addEventListener('error', handleErrorEvent);
+        
+        // Give time for widget to initialize
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Start monitoring
+        await widget.startMonitoring();
+        isAnalyzing = true;
+        
+        updateStatus('Analysis in progress. Please keep your face visible.');
+      } catch (error) {
+        console.error('Error starting analysis:', error);
+        updateStatus('Error: ' + (error.message || 'Failed to start analysis'), true);
+        resetControls();
+      }
+    }
+    
+    async function stopAnalysis() {
+      try {
+        if (widget) {
+          await widget.stopMonitoring();
+        }
+        
+        isAnalyzing = false;
+        resetControls();
+        updateStatus('Analysis stopped');
+      } catch (error) {
+        console.error('Error stopping analysis:', error);
+        updateStatus('Error stopping analysis', true);
+        resetControls();
+      }
+    }
+    
+    function resetControls() {
+      startButton.disabled = false;
+      stopButton.disabled = true;
+    }
+    
+    function handleVitalsEvent(event) {
+      try {
+        const data = event.detail;
+        
+        if (data && data.vital_signs) {
+          // Update heart rate
+          if (data.vital_signs.heart_rate) {
+            const heartRate = data.vital_signs.heart_rate.value;
+            heartRateElement.textContent = Math.round(heartRate);
+          }
+          
+          // Update respiratory rate
+          if (data.vital_signs.respiratory_rate) {
+            const respiratoryRate = data.vital_signs.respiratory_rate.value;
+            respiratoryRateElement.textContent = respiratoryRate.toFixed(1);
+          }
+          
+          updateStatus('Analyzing vital signs...');
+        }
+      } catch (error) {
+        console.error('Error processing vitals data:', error);
+      }
+    }
+    
+    function handleErrorEvent(event) {
+      console.error('Widget error:', event.detail);
+      updateStatus('Error: ' + (event.detail.message || 'Unknown error'), true);
+      resetControls();
+    }
+    
+    // Event listeners
+    startButton.addEventListener('click', startAnalysis);
+    stopButton.addEventListener('click', stopAnalysis);
+  </script>
+</body>
+</html>
