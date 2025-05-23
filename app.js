@@ -201,99 +201,67 @@ document.addEventListener('DOMContentLoaded', () => {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   }
 
-  // Function to enumerate cameras
+  // Function to enumerate cameras - simplified to just enable the start button
   async function listCameras() {
     try {
       // Reset the camera dropdown
       cameraSelect.innerHTML = '';
-      cameraSelect.disabled = true;
       
-      // Special handling for iOS devices
-      if (isIOS()) {
-        console.log('iOS device detected, using simplified camera access');
-        // On iOS, we can't enumerate cameras properly before requesting access
-        // Add a default camera option
-        const option = document.createElement('option');
-        option.value = 'default';
-        option.text = 'Default Camera';
-        cameraSelect.appendChild(option);
-        
-        selectedCameraId = 'default';
-        cameraSelect.value = selectedCameraId;
-        cameraSelect.disabled = true; // Disable selection on iOS as switching is problematic
-        startButton.disabled = false;
-        
-        updateStatus('Camera ready. Click Start to begin Knowlithic analysis.');
-        return;
-      }
-      
-      // For non-iOS devices, proceed with normal enumeration
-      // First request camera access to ensure we get labeled devices
-      if (isMobile()) {
-        // For mobile, use a simpler approach
-        await navigator.mediaDevices.getUserMedia({ video: true });
-      }
-      
-      // Get list of available video devices
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      availableCameras = devices.filter(device => device.kind === 'videoinput');
-      
-      if (availableCameras.length === 0) {
-        // Fallback if no cameras found
-        const option = document.createElement('option');
-        option.value = 'default';
-        option.text = 'Default Camera';
-        cameraSelect.appendChild(option);
-        
-        selectedCameraId = 'default';
-        cameraSelect.value = selectedCameraId;
-        startButton.disabled = false;
-        
-        updateStatus('Using default camera. Click Start to begin Knowlithic analysis.');
-        return;
-      }
-      
-      // Add cameras to dropdown
-      availableCameras.forEach((camera, index) => {
-        const option = document.createElement('option');
-        option.value = camera.deviceId;
-        option.text = camera.label || `Camera ${index + 1}`;
-        cameraSelect.appendChild(option);
-      });
-      
-      // Select the first camera by default
-      selectedCameraId = availableCameras[0].deviceId;
-      cameraSelect.value = selectedCameraId;
-      cameraSelect.disabled = false;
-      startButton.disabled = false;
-      
-      updateStatus('Camera detected. Click Start to begin Knowlithic analysis.');
-    } catch (error) {
-      console.error('Error listing cameras:', error);
-      // Fallback for errors
-      cameraSelect.innerHTML = '';
+      // Add a default camera option - simplest approach
       const option = document.createElement('option');
       option.value = 'default';
       option.text = 'Default Camera';
       cameraSelect.appendChild(option);
       
+      // Set default selection
       selectedCameraId = 'default';
       cameraSelect.value = selectedCameraId;
-      cameraSelect.disabled = true;
+      
+      // On iOS or other mobile, disable camera selection as it's unreliable
+      if (isIOS() || isMobile()) {
+        cameraSelect.disabled = true;
+      } else {
+        // Try to enumerate cameras on desktop browsers
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const cameras = devices.filter(device => device.kind === 'videoinput');
+          
+          if (cameras.length > 0) {
+            // Clear the select and add all cameras
+            cameraSelect.innerHTML = '';
+            cameras.forEach((camera, index) => {
+              const opt = document.createElement('option');
+              opt.value = camera.deviceId || `camera-${index}`;
+              opt.text = camera.label || `Camera ${index + 1}`;
+              cameraSelect.appendChild(opt);
+            });
+            
+            // Select first camera
+            selectedCameraId = cameras[0].deviceId || 'default';
+            cameraSelect.value = selectedCameraId;
+            cameraSelect.disabled = false;
+          }
+        } catch (enumError) {
+          console.log('Camera enumeration failed, using default', enumError);
+          // Keep the default option if enumeration fails
+        }
+      }
+      
+      // ALWAYS enable the start button regardless of camera detection
       startButton.disabled = false;
       
-      updateStatus('Camera access ready. Click Start to begin.');
+      updateStatus('Ready. Click Start to begin Knowlithic analysis.');
+    } catch (error) {
+      console.error('Error in camera setup:', error);
+      // Even if there's an error, enable the start button with default camera
+      startButton.disabled = false;
+      updateStatus('Camera setup ready. Click Start to begin.');
     }
   }
   
-  // Function to start monitoring
+  // Function to start monitoring - extremely simplified version
   async function startMonitoring() {
     try {
-      if (!selectedCameraId) {
-        updateStatus('No camera selected', true);
-        return;
-      }
-      
       // Update UI
       startButton.disabled = true;
       stopButton.disabled = false;
@@ -301,55 +269,38 @@ document.addEventListener('DOMContentLoaded', () => {
       cameraStatus.style.display = 'none';
       updateStatus('Initializing Knowlithic vital signs analysis...');
       
-      // Simplify the approach - we'll let the VitalLens widget handle the camera access
-      // This is more reliable across browsers
-      
-      // Remove any existing widget to ensure clean initialization
-      const oldWidget = document.getElementById('vitallens-widget');
-      const widgetContainer = document.getElementById('camera-widget-container');
-      
-      if (oldWidget) {
-        try {
-          // Try to stop any existing monitoring
-          if (typeof oldWidget.stopMonitoring === 'function') {
-            await oldWidget.stopMonitoring();
-          }
-        } catch (e) {
-          console.log('Could not stop old widget:', e);
-        }
-        
-        // Remove the old widget
-        widgetContainer.removeChild(oldWidget);
-      }
-      
-      // Create a fresh widget
-      const newWidget = document.createElement('vitallens-webcam-widget');
-      newWidget.setAttribute('id', 'vitallens-widget');
-      newWidget.setAttribute('api-key', API_KEY);
-      
-      // Add the new widget to the container
-      widgetContainer.appendChild(newWidget);
-      
-      // Update our reference
-      vitallensWidget = newWidget;
-      
-      // Set up event listeners on the new widget
-      setupWidgetEventListeners();
-      
-      // Give the DOM a moment to update
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      // Simplest approach possible - create a new widget directly in place
       try {
-        console.log('Starting monitoring with fresh widget');
+        // First try to clean up any existing instances
+        const container = document.getElementById('camera-widget-container');
+        container.innerHTML = ''; // Clear everything
+        
+        // Create a fresh widget
+        const widget = document.createElement('vitallens-webcam-widget');
+        widget.id = 'vitallens-widget';
+        widget.setAttribute('api-key', API_KEY);
+        
+        // Add to container
+        container.appendChild(widget);
+        
+        // Get a reference to the widget
+        vitallensWidget = widget;
+        
+        // Set up listeners
+        widget.addEventListener('vitals', handleVitalsEvent);
+        widget.addEventListener('error', handleErrorEvent);
+        
+        // Simple delay to let things initialize
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         // Start monitoring
-        await vitallensWidget.startMonitoring();
+        await widget.startMonitoring();
         isMonitoring = true;
         
         updateStatus('Knowlithic is analyzing your vital signs. Please keep your face visible to the camera.');
-      } catch (widgetError) {
-        console.error('Error starting VitalLens widget:', widgetError);
-        throw new Error('Could not initialize analysis. Please try refreshing the page.');
+      } catch (err) {
+        console.error('Error with widget:', err);
+        throw new Error('Please allow camera access to use Knowlithic.');
       }
     } catch (error) {
       console.error('Error in startMonitoring:', error);
@@ -407,26 +358,22 @@ document.addEventListener('DOMContentLoaded', () => {
   startButton.addEventListener('click', startMonitoring);
   stopButton.addEventListener('click', stopMonitoring);
   
-  // Initialize the widget when the page loads
+  // Initialize the widget when the page loads - simplified version
   function initializeWidget() {
-    // Get the widget container
+    // We'll only create a placeholder - the actual widget will be created when Start is clicked
+    // This avoids early camera permission requests that might confuse users
     const widgetContainer = document.getElementById('camera-widget-container');
     
-    // Create the widget element
-    const widget = document.createElement('vitallens-webcam-widget');
-    widget.setAttribute('id', 'vitallens-widget');
-    widget.setAttribute('api-key', API_KEY);
+    // Create a placeholder message
+    const placeholder = document.createElement('div');
+    placeholder.className = 'widget-placeholder';
+    placeholder.innerHTML = '<p>Click Start to begin camera access and analysis</p>';
     
-    // Add the widget to the container
-    widgetContainer.appendChild(widget);
+    // Add the placeholder to the container
+    widgetContainer.innerHTML = '';
+    widgetContainer.appendChild(placeholder);
     
-    // Update our reference
-    vitallensWidget = document.getElementById('vitallens-widget');
-    
-    // Set up event listeners
-    setupWidgetEventListeners();
-    
-    console.log('Widget initialized');
+    console.log('Widget container prepared');
   }
   
   // Initialize cameras and widget when the page loads
