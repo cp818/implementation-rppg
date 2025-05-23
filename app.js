@@ -104,8 +104,21 @@ document.addEventListener('DOMContentLoaded', () => {
     drawWaveform(respiratoryWaveformCanvas, respiratoryCtx, respiratoryWaveformData, 'var(--secondary)');
   }
 
-  // Listen for vitals events from the widget
-  vitallensWidget.addEventListener('vitals', (event) => {
+  // Function to set up event listeners for the widget
+  function setupWidgetEventListeners() {
+    // Remove any existing event listeners to prevent duplicates
+    vitallensWidget.removeEventListener('vitals', handleVitalsEvent);
+    vitallensWidget.removeEventListener('error', handleErrorEvent);
+    
+    // Add event listeners
+    vitallensWidget.addEventListener('vitals', handleVitalsEvent);
+    vitallensWidget.addEventListener('error', handleErrorEvent);
+    
+    console.log('Widget event listeners set up');
+  }
+  
+  // Handle vitals events from the widget
+  function handleVitalsEvent(event) {
     try {
       const vitalData = event.detail;
       
@@ -140,19 +153,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         updateWaveforms();
-        updateStatus('Measuring vital signs...');
+        updateStatus('Knowlithic is analyzing your vital signs...');
       }
     } catch (error) {
       console.error('Error processing vital signs data:', error);
-      updateStatus('Error processing data', true);
+      updateStatus('Error processing data. Please try restarting the analysis.', true);
     }
-  });
-
-  // Listen for errors from the widget
-  vitallensWidget.addEventListener('error', (event) => {
+  }
+  
+  // Handle error events from the widget
+  function handleErrorEvent(event) {
     console.error('VitalLens error:', event.detail);
-    updateStatus(`Error: ${event.detail.message || 'Unknown error'}`, true);
-  });
+    
+    // Map common error messages to more user-friendly ones
+    let errorMessage = event.detail.message || 'Unknown error';
+    
+    if (errorMessage.includes('permission') || errorMessage.includes('Permission') || 
+        errorMessage.includes('denied') || errorMessage.includes('access')) {
+      errorMessage = 'Camera access is required. Please refresh the page and allow camera access when prompted.';
+    }
+    
+    updateStatus(`Error: ${errorMessage}`, true);
+    resetControls();
+  }
+  
+  // Call to set up the event listeners when the page loads
+  setupWidgetEventListeners();
 
   // Handle window resize to update canvas dimensions
   function resizeCanvases() {
@@ -275,35 +301,50 @@ document.addEventListener('DOMContentLoaded', () => {
       cameraStatus.style.display = 'none';
       updateStatus('Initializing Knowlithic vital signs analysis...');
       
-      // Handle default camera differently
-      if (selectedCameraId === 'default') {
-        // For iOS and fallback cases, don't set a specific camera ID
-        // and let the browser choose the default camera
-        console.log('Using default camera');  
+      let stream = null;
+      
+      // First get camera access explicitly before starting the widget
+      try {
+        // Request camera access directly
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: {
+            // Don't specify exact deviceId for default camera option
+            ...(selectedCameraId !== 'default' && { deviceId: { exact: selectedCameraId } })
+          } 
+        });
         
-        // Start the widget without specifying a camera
-        try {
-          // Make sure we have camera permissions
-          await navigator.mediaDevices.getUserMedia({ video: true });
-          await vitallensWidget.startMonitoring();
-          isMonitoring = true;
-        } catch (mediaError) {
-          console.error('Media access error:', mediaError);
-          throw new Error('Camera access denied. Please allow camera access to use Knowlithic.');
+        console.log('Camera access granted successfully');
+      } catch (mediaError) {
+        console.error('Could not access camera:', mediaError);
+        throw new Error('Camera access denied. Please allow camera access and refresh the page.');
+      }
+      
+      // Handle starting the monitoring with the granted camera access
+      try {
+        if (selectedCameraId === 'default') {
+          // Don't set a specific camera ID, let the browser use the default
+          console.log('Using default camera');  
+        } else {
+          // For specific camera selection
+          console.log('Using selected camera:', selectedCameraId);
+          vitallensWidget.setAttribute('camera-id', selectedCameraId);
         }
-      } else {
-        // For non-iOS devices with specific camera selection
-        // Configure the VitalLens widget with selected camera
-        vitallensWidget.setAttribute('camera-id', selectedCameraId);
         
         // Start the widget
         await vitallensWidget.startMonitoring();
         isMonitoring = true;
+        
+        updateStatus('Knowlithic is analyzing your vital signs. Please keep your face visible to the camera.');
+      } catch (widgetError) {
+        console.error('Error starting VitalLens widget:', widgetError);
+        // Release the camera stream we obtained if the widget fails
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+        throw new Error('Could not initialize analysis. Please try again.');
       }
-      
-      updateStatus('Knowlithic is analyzing your vital signs. Please keep your face visible to the camera.');
     } catch (error) {
-      console.error('Error starting monitoring:', error);
+      console.error('Error in startMonitoring:', error);
       updateStatus(`Error: ${error.message || 'Failed to start monitoring'}`, true);
       resetControls();
     }
@@ -313,7 +354,23 @@ document.addEventListener('DOMContentLoaded', () => {
   async function stopMonitoring() {
     try {
       // Stop the widget
-      await vitallensWidget.stopMonitoring();
+      if (vitallensWidget && typeof vitallensWidget.stopMonitoring === 'function') {
+        await vitallensWidget.stopMonitoring();
+      } else {
+        console.warn('VitalLens widget not properly initialized when stopping');
+      }
+      
+      // Ensure all camera tracks are stopped
+      try {
+        const streams = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (streams && streams.getTracks) {
+          streams.getTracks().forEach(track => track.stop());
+        }
+      } catch (e) {
+        // Ignore errors when trying to clean up streams
+        console.log('Could not get current streams for cleanup');
+      }
+      
       isMonitoring = false;
       
       // Reset UI
@@ -321,7 +378,9 @@ document.addEventListener('DOMContentLoaded', () => {
       updateStatus('Analysis stopped. Click Start to begin another Knowlithic session.');
     } catch (error) {
       console.error('Error stopping monitoring:', error);
-      updateStatus(`Error: ${error.message || 'Failed to stop monitoring'}`, true);
+      // Even if there's an error, try to reset the UI
+      resetControls();
+      updateStatus(`Error during shutdown: ${error.message || 'Unknown error'}. You can try again.`, true);
     }
   }
   
