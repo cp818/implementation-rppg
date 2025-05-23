@@ -1,104 +1,726 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Knowlithic - Vital Signs Analysis</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/vitallens/dist/vitallens.browser.js"></script>
-  <link rel="preconnect" href="https://api.rouast.com" crossorigin>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowlithic - Simple rPPG Heart Rate Monitor</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #3498db;
+            --success-color: #2ecc71;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --light-color: #ecf0f1;
+            --dark-color: #34495e;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: var(--primary-color);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        header h1 {
+            margin: 0;
+            font-size: 2rem;
+        }
+        
+        .content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 2rem;
+        }
+        
+        .video-container {
+            width: 100%;
+            max-width: 640px;
+            margin-bottom: 1rem;
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        #videoElement {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        #canvasElement {
+            display: none;
+        }
+        
+        #faceCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        .placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--light-color);
+            color: var(--dark-color);
+            font-size: 1.2rem;
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            width: 100%;
+            max-width: 640px;
+        }
+        
+        button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            width: 50%;
+        }
+        
+        #startBtn {
+            background-color: var(--success-color);
+            color: white;
+        }
+        
+        #startBtn:hover {
+            background-color: #27ae60;
+        }
+        
+        #stopBtn {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        #stopBtn:hover {
+            background-color: #c0392b;
+        }
+
+        #cameraSelect {
+            width: 100%;
+            max-width: 640px;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+            border: 1px solid var(--primary-color);
+        }
+        
+        .measurements {
+            width: 100%;
+            max-width: 640px;
+            background-color: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .vital-sign {
+            margin-bottom: 1.5rem;
+        }
+        
+        .vital-sign h3 {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            color: var(--dark-color);
+        }
+        
+        .value-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+        
+        .units {
+            font-size: 1rem;
+            color: var(--primary-color);
+        }
+        
+        .status {
+            text-align: center;
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        
+        .status.connecting {
+            background-color: var(--warning-color);
+            color: white;
+        }
+        
+        .status.active {
+            background-color: var(--success-color);
+            color: white;
+        }
+        
+        .status.error {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        #signalGraph {
+            width: 100%;
+            height: 150px;
+            background-color: var(--light-color);
+            border-radius: 4px;
+            margin-top: 1rem;
+            position: relative;
+        }
+        
+        .graph-container {
+            width: 100%;
+            max-width: 640px;
+            margin-bottom: 2rem;
+        }
+        
+        .graph-title {
+            font-size: 1rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        footer {
+            margin-top: 3rem;
+            padding: 1rem;
+            background-color: var(--primary-color);
+            color: white;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        
+        .disclaimer {
+            margin-top: 0.5rem;
+            font-style: italic;
+            font-size: 0.8rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
     <header>
-      <div class="logo">
-        <div class="logo-icon"><span>K</span></div>
-      </div>
-      <h1>Knowlithic</h1>
-      <p>Advanced vital signs analysis powered by AI</p>
+        <h1>Knowlithic</h1>
+        <p>Simple rPPG Heart Rate Monitor</p>
     </header>
     
-    <main>
-      <div class="app-container">
-        <div class="controls-container">
-          <div class="card">
-            <h2>Camera Controls</h2>
-            <div class="control-options">
-              <div class="control-group">
-                <label for="camera-select">Camera:</label>
-                <select id="camera-select" disabled>
-                  <option value="">Loading cameras...</option>
-                </select>
-              </div>
-              <div class="control-buttons">
-                <button id="start-button" class="btn btn-primary">Start</button>
-                <button id="stop-button" class="btn btn-danger" disabled>Stop</button>
-              </div>
+    <div class="container">
+        <div class="content">
+            <select id="cameraSelect">
+                <option value="">Loading cameras...</option>
+            </select>
+            
+            <div class="video-container">
+                <video id="videoElement" autoplay playsinline></video>
+                <canvas id="canvasElement"></canvas>
+                <canvas id="faceCanvas"></canvas>
+                <div id="placeholder" class="placeholder">
+                    <p>Click Start to begin monitoring your heart rate</p>
+                </div>
             </div>
-          </div>
-        </div>
-        <div class="camera-container">
-          <div id="camera-status">Camera access required</div>
-          <div id="camera-widget-container">
-            <!-- VitalLens widget will be dynamically created here -->
-          </div>
-        </div>
-        
-        <div class="measurements-container">
-          <div class="card">
-            <h2>Heart Rate</h2>
-            <div class="measurement">
-              <span id="heart-rate-value">--</span>
-              <span class="unit">BPM</span>
+            
+            <div class="controls">
+                <button id="startBtn">Start Monitoring</button>
+                <button id="stopBtn" disabled>Stop Monitoring</button>
             </div>
-            <div class="confidence-bar">
-              <div id="heart-rate-confidence" class="confidence-level" style="width: 0%"></div>
+            
+            <div class="measurements">
+                <div id="statusContainer" class="status connecting">
+                    Waiting to start...
+                </div>
+                
+                <div class="vital-sign">
+                    <h3>Heart Rate</h3>
+                    <div class="value-container">
+                        <div id="heartRateValue" class="value">--</div>
+                        <div class="units">BPM</div>
+                    </div>
+                </div>
             </div>
-          </div>
-          
-          <div class="card">
-            <h2>Respiratory Rate</h2>
-            <div class="measurement">
-              <span id="respiratory-rate-value">--</span>
-              <span class="unit">breaths/min</span>
+            
+            <div class="graph-container">
+                <div class="graph-title">Raw Signal</div>
+                <canvas id="signalGraph"></canvas>
             </div>
-            <div class="confidence-bar">
-              <div id="respiratory-rate-confidence" class="confidence-level" style="width: 0%"></div>
-            </div>
-          </div>
-          
-          <div class="card">
-            <h2>Status</h2>
-            <div id="status-message">Waiting for camera...</div>
-          </div>
         </div>
-      </div>
-      
-      <div class="waveform-container">
-        <div class="card">
-          <h2>Pulse Waveform</h2>
-          <canvas id="pulse-waveform" height="100"></canvas>
-        </div>
-        <div class="card">
-          <h2>Respiratory Waveform</h2>
-          <canvas id="respiratory-waveform" height="100"></canvas>
-        </div>
-      </div>
-    </main>
+    </div>
     
     <footer>
-      <div class="footer-content">
-        <div class="copyright">
-          <p>© 2025 Knowlithic</p>
-          <p>Version 1.0</p>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p class="disclaimer">Disclaimer: Knowlithic provides measurements for informational purposes only and not for medical use. Always consult healthcare professionals for medical advice.</p>
-      </div>
+        <p>&copy; 2025 Knowlithic</p>
+        <p class="disclaimer">This application provides vital sign estimates for general wellness purposes only. It is not intended for medical use.</p>
     </footer>
-  </div>
-  
-  <script src="app.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const videoElement = document.getElementById('videoElement');
+            const canvasElement = document.getElementById('canvasElement');
+            const faceCanvas = document.getElementById('faceCanvas');
+            const signalGraph = document.getElementById('signalGraph');
+            const placeholder = document.getElementById('placeholder');
+            const statusContainer = document.getElementById('statusContainer');
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const heartRateValue = document.getElementById('heartRateValue');
+            const cameraSelect = document.getElementById('cameraSelect');
+            
+            // Canvas contexts
+            const canvasCtx = canvasElement.getContext('2d', { willReadFrequently: true });
+            const faceCtx = faceCanvas.getContext('2d');
+            const graphCtx = signalGraph.getContext('2d');
+            
+            // Variables for rPPG processing
+            let isMonitoring = false;
+            let animationFrameId = null;
+            let mediaStream = null;
+            let timeSeriesData = [];
+            let lastProcessingTime = 0;
+            let processingInterval = 30; // Process every 30ms
+            const windowSize = 300; // 10 seconds at 30fps
+            const signalValues = new Array(windowSize).fill(0);
+            const graphWidth = signalGraph.width;
+            const graphHeight = signalGraph.height;
+            
+            // Load face-api.js for face detection
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+            document.head.appendChild(script);
+            
+            // Face detection models
+            let faceDetectionModel = null;
+            let faceDetectionOptions = null;
+            
+            // Initialize face detection after face-api.js is loaded
+            script.onload = async () => {
+                try {
+                    await faceapi.nets.tinyFaceDetector.load('/');
+                    faceDetectionModel = faceapi.nets.tinyFaceDetector;
+                    faceDetectionOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+                    updateStatus('connecting', 'Face detection ready, click Start to begin');
+                } catch (error) {
+                    console.error('Error loading face detection model:', error);
+                    updateStatus('error', 'Failed to load face detection models');
+                }
+            };
+            
+            // Get available cameras
+            async function getCameras() {
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                    
+                    if (videoDevices.length === 0) {
+                        throw new Error('No cameras found');
+                    }
+                    
+                    cameraSelect.innerHTML = '';
+                    videoDevices.forEach(device => {
+                        const option = document.createElement('option');
+                        option.value = device.deviceId;
+                        option.text = device.label || `Camera ${cameraSelect.options.length + 1}`;
+                        cameraSelect.appendChild(option);
+                    });
+                    
+                    // If there are no labels, it means we need permission first
+                    if (!videoDevices[0].label) {
+                        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        tempStream.getTracks().forEach(track => track.stop());
+                        // Refresh the list now that we have permission
+                        getCameras();
+                    }
+                } catch (error) {
+                    console.error('Error getting cameras:', error);
+                    cameraSelect.innerHTML = '<option value="">No cameras available</option>';
+                    updateStatus('error', 'Error accessing cameras');
+                }
+            }
+            
+            // Initialize camera
+            async function initCamera() {
+                try {
+                    if (mediaStream) {
+                        mediaStream.getTracks().forEach(track => track.stop());
+                    }
+                    
+                    const constraints = {
+                        video: {
+                            deviceId: cameraSelect.value ? { exact: cameraSelect.value } : undefined,
+                            width: { ideal: 640 },
+                            height: { ideal: 480 },
+                            frameRate: { ideal: 30 }
+                        }
+                    };
+                    
+                    mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    videoElement.srcObject = mediaStream;
+                    
+                    // Wait for video to be ready
+                    await new Promise(resolve => {
+                        videoElement.onloadedmetadata = () => {
+                            videoElement.play();
+                            resolve();
+                        };
+                    });
+                    
+                    // Set canvas sizes
+                    canvasElement.width = videoElement.videoWidth;
+                    canvasElement.height = videoElement.videoHeight;
+                    faceCanvas.width = videoElement.videoWidth;
+                    faceCanvas.height = videoElement.videoHeight;
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Error initializing camera:', error);
+                    updateStatus('error', 'Error accessing camera: ' + error.message);
+                    return false;
+                }
+            }
+            
+            // Process video frame for rPPG
+            async function processFrame(timestamp) {
+                if (!isMonitoring) return;
+                
+                // Limit processing rate
+                if (timestamp - lastProcessingTime < processingInterval) {
+                    animationFrameId = requestAnimationFrame(processFrame);
+                    return;
+                }
+                
+                lastProcessingTime = timestamp;
+                
+                // Draw video to canvas
+                canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+                
+                // Detect face
+                if (faceDetectionModel && faceDetectionOptions) {
+                    try {
+                        const detections = await faceapi.detectAllFaces(canvasElement, faceDetectionOptions);
+                        
+                        // Clear previous drawings
+                        faceCtx.clearRect(0, 0, faceCanvas.width, faceCanvas.height);
+                        
+                        if (detections.length > 0) {
+                            const detection = detections[0]; // Use the first detected face
+                            const forehead = {
+                                x: detection.box.x + detection.box.width * 0.3,
+                                y: detection.box.y + detection.box.height * 0.2,
+                                width: detection.box.width * 0.4,
+                                height: detection.box.height * 0.2
+                            };
+                            
+                            // Draw face detection rectangle
+                            faceCtx.strokeStyle = '#00ff00';
+                            faceCtx.lineWidth = 2;
+                            faceCtx.strokeRect(detection.box.x, detection.box.y, detection.box.width, detection.box.height);
+                            
+                            // Draw forehead ROI
+                            faceCtx.strokeStyle = '#ff0000';
+                            faceCtx.strokeRect(forehead.x, forehead.y, forehead.width, forehead.height);
+                            
+                            // Extract pixel data from forehead region
+                            const roiData = canvasCtx.getImageData(forehead.x, forehead.y, forehead.width, forehead.height);
+                            
+                            // Calculate average RGB values
+                            let r = 0, g = 0, b = 0;
+                            const pixels = roiData.data.length / 4;
+                            
+                            for (let i = 0; i < roiData.data.length; i += 4) {
+                                r += roiData.data[i];
+                                g += roiData.data[i + 1];
+                                b += roiData.data[i + 2];
+                            }
+                            
+                            r /= pixels;
+                            g /= pixels;
+                            b /= pixels;
+                            
+                            // Simple green channel method for heart rate detection
+                            // Store time series data
+                            timeSeriesData.push({
+                                timestamp: Date.now(),
+                                r: r,
+                                g: g,
+                                b: b
+                            });
+                            
+                            // Keep only the most recent data
+                            if (timeSeriesData.length > windowSize) {
+                                timeSeriesData.shift();
+                            }
+                            
+                            // Process data and update heart rate if we have enough samples
+                            if (timeSeriesData.length >= windowSize / 2) {
+                                updateHeartRate();
+                            }
+                            
+                            // Update status to active
+                            updateStatus('active', 'Monitoring active');
+                        } else {
+                            updateStatus('warning', 'No face detected');
+                        }
+                    } catch (error) {
+                        console.error('Error in face detection:', error);
+                    }
+                }
+                
+                // Continue processing frames
+                animationFrameId = requestAnimationFrame(processFrame);
+            }
+            
+            // Calculate and update heart rate
+            function updateHeartRate() {
+                if (timeSeriesData.length < 20) return;
+                
+                // Extract green channel (most sensitive to blood volume changes)
+                const greenSignal = timeSeriesData.map(data => data.g);
+                
+                // Normalize the signal
+                const mean = greenSignal.reduce((a, b) => a + b, 0) / greenSignal.length;
+                const normalizedSignal = greenSignal.map(value => value - mean);
+                
+                // Simple moving average filter to reduce noise
+                const filteredSignal = [];
+                const filterSize = 5;
+                
+                for (let i = 0; i < normalizedSignal.length; i++) {
+                    let sum = 0;
+                    let count = 0;
+                    
+                    for (let j = Math.max(0, i - filterSize + 1); j <= i; j++) {
+                        sum += normalizedSignal[j];
+                        count++;
+                    }
+                    
+                    filteredSignal.push(sum / count);
+                }
+                
+                // Update signal display data
+                for (let i = 0; i < filteredSignal.length; i++) {
+                    if (i < windowSize) {
+                        signalValues[i] = filteredSignal[i];
+                    }
+                }
+                
+                // Find peaks in the signal
+                const peaks = findPeaks(filteredSignal);
+                
+                // Calculate heart rate from peak intervals
+                if (peaks.length >= 2) {
+                    const intervals = [];
+                    
+                    for (let i = 1; i < peaks.length; i++) {
+                        const timeDiff = timeSeriesData[peaks[i]].timestamp - timeSeriesData[peaks[i - 1]].timestamp;
+                        intervals.push(timeDiff);
+                    }
+                    
+                    // Filter out unreasonable intervals
+                    const validIntervals = intervals.filter(interval => interval > 250 && interval < 1500);
+                    
+                    if (validIntervals.length > 0) {
+                        const avgInterval = validIntervals.reduce((a, b) => a + b, 0) / validIntervals.length;
+                        const heartRate = 60000 / avgInterval; // Convert to BPM
+                        
+                        // Filter heart rate to physiological range (40-180 BPM)
+                        if (heartRate >= 40 && heartRate <= 180) {
+                            heartRateValue.textContent = heartRate.toFixed(1);
+                        }
+                    }
+                }
+                
+                // Draw signal graph
+                drawSignalGraph();
+            }
+            
+            // Find peaks in the signal using a simple threshold-based algorithm
+            function findPeaks(signal) {
+                const peaks = [];
+                const minPeakDistance = 10; // Minimum samples between peaks
+                
+                let lastPeakIndex = -minPeakDistance;
+                
+                for (let i = 1; i < signal.length - 1; i++) {
+                    if (signal[i] > signal[i - 1] && signal[i] > signal[i + 1] && i - lastPeakIndex >= minPeakDistance) {
+                        peaks.push(i);
+                        lastPeakIndex = i;
+                    }
+                }
+                
+                return peaks;
+            }
+            
+            // Draw the signal graph
+            function drawSignalGraph() {
+                graphCtx.clearRect(0, 0, graphWidth, graphHeight);
+                
+                // Find min and max values for scaling
+                let min = Math.min(...signalValues);
+                let max = Math.max(...signalValues);
+                
+                // Ensure we have a range to avoid division by zero
+                if (max - min < 0.001) {
+                    min -= 0.5;
+                    max += 0.5;
+                }
+                
+                // Add some padding
+                const padding = (max - min) * 0.1;
+                min -= padding;
+                max += padding;
+                
+                // Draw axes
+                graphCtx.strokeStyle = '#ccc';
+                graphCtx.beginPath();
+                graphCtx.moveTo(0, graphHeight / 2);
+                graphCtx.lineTo(graphWidth, graphHeight / 2);
+                graphCtx.stroke();
+                
+                // Draw signal
+                graphCtx.strokeStyle = '#3498db';
+                graphCtx.lineWidth = 2;
+                graphCtx.beginPath();
+                
+                for (let i = 0; i < signalValues.length; i++) {
+                    const x = (i / signalValues.length) * graphWidth;
+                    const y = graphHeight - ((signalValues[i] - min) / (max - min)) * graphHeight * 0.8 - graphHeight * 0.1;
+                    
+                    if (i === 0) {
+                        graphCtx.moveTo(x, y);
+                    } else {
+                        graphCtx.lineTo(x, y);
+                    }
+                }
+                
+                graphCtx.stroke();
+            }
+            
+            // Update status message
+            function updateStatus(type, message) {
+                statusContainer.className = `status ${type}`;
+                statusContainer.textContent = message;
+            }
+            
+            // Start monitoring
+            async function startMonitoring() {
+                placeholder.style.display = 'none';
+                updateStatus('connecting', 'Initializing camera...');
+                
+                const cameraInitialized = await initCamera();
+                
+                if (cameraInitialized) {
+                    isMonitoring = true;
+                    timeSeriesData = [];
+                    signalValues.fill(0);
+                    heartRateValue.textContent = '--';
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    
+                    // Start processing frames
+                    animationFrameId = requestAnimationFrame(processFrame);
+                }
+            }
+            
+            // Stop monitoring
+            function stopMonitoring() {
+                isMonitoring = false;
+                
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+                
+                if (mediaStream) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                    mediaStream = null;
+                }
+                
+                videoElement.srcObject = null;
+                faceCtx.clearRect(0, 0, faceCanvas.width, faceCanvas.height);
+                graphCtx.clearRect(0, 0, graphWidth, graphHeight);
+                
+                placeholder.style.display = 'flex';
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                heartRateValue.textContent = '--';
+                updateStatus('connecting', 'Waiting to start...');
+            }
+            
+            // Event listeners
+            startBtn.addEventListener('click', startMonitoring);
+            stopBtn.addEventListener('click', stopMonitoring);
+            cameraSelect.addEventListener('change', () => {
+                if (isMonitoring) {
+                    stopMonitoring();
+                    setTimeout(startMonitoring, 500);
+                }
+            });
+            
+            // Initialize camera dropdown
+            getCameras();
+            
+            // Make sure we clean up when the page unloads
+            window.addEventListener('beforeunload', () => {
+                if (mediaStream) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                }
+            });
+        });
+    </script>
 </body>
 </html>
